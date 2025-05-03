@@ -81,6 +81,8 @@ def train(model, args):
             curriculum.n_dims_truncated,
             **data_sampler_args,
         )
+        if (args.training.task == "kernel_regression"):
+            task_sampler_args["n_points"] = curriculum.n_points
         task = task_sampler(**task_sampler_args)
         ys = task.evaluate(xs)
 
