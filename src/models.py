@@ -62,6 +62,11 @@ def build_model(conf):
 
 def get_relevant_baselines(task_name):
     task_to_baselines = {
+        "kernel_regression": [
+            (LeastSquaresModel, {}),
+            (NNModel, {"n_neighbors": 3}),
+            (KernelRidgeRegressionModel, {}),
+        ],
         "linear_regression": [
             (LeastSquaresModel, {}),
             (NNModel, {"n_neighbors": 3}),
