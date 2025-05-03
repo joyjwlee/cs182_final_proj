@@ -8,8 +8,8 @@ import torch
 import yaml
 
 from eval import get_run_metrics
-from data import get_task_sampler
-from data import get_data_sampler
+from data.tasks import get_task_sampler
+from data.data_sampler import get_data_sampler
 from curriculum import Curriculum
 from schema import schema
 from models import build_model
