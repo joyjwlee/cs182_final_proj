@@ -8,8 +8,8 @@ import torch
 import yaml
 
 from eval import get_run_metrics
-from data import get_task_sampler
-from data import get_data_sampler
+from data.tasks import get_task_sampler
+from data.data_sampler import get_data_sampler
 from curriculum import Curriculum
 from schema import schema
 from models import build_model
@@ -81,7 +81,7 @@ def train(model, args):
             curriculum.n_dims_truncated,
             **data_sampler_args,
         )
-        if (args.training.task == "kernel_regression"):
+        if args.training.task == "kernel_regression":
             task_sampler_args["n_points"] = curriculum.n_points
         task = task_sampler(**task_sampler_args)
         ys = task.evaluate(xs)
@@ -166,7 +166,7 @@ def main(args):
 if __name__ == "__main__":
     parser = QuinineArgumentParser(schema=schema)
     args = parser.parse_quinfig()
-    assert args.model.family in ["gpt2", "lstm", "nanogpt"]
+    assert args.model.family in ["gpt2", "lstm", "nanogpt", "mamba"]
     print(f"Running with: {args}")
 
     if not args.test_run:

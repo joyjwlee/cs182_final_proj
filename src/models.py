@@ -13,6 +13,9 @@ from base_models import NeuralNetwork, ParallelNetworks
 # Import custom NanoGPT
 from nanogpt_model import GPTConfig as NanoGPTConfig, GPT as NanoGPTCore
 
+# Import custom Mamba (using minimal version)
+from mamba_model import ModelArgs, ResidualBlock, RMSNorm
+
 def build_model(conf):
     if conf.family == "gpt2":
         model = TransformerModel(
@@ -33,6 +36,20 @@ def build_model(conf):
             # Add other NanoGPT specific config e.g. dropout and bias
             dropout=conf.dropout if hasattr(conf, 'dropout') else 0.0,
             bias=conf.bias if hasattr(conf, 'bias') else True,
+        )
+    elif conf.family == "mamba":
+        model = MambaICLModel(
+            n_dims=conf.n_dims,
+            n_positions=conf.n_positions,
+            n_embd=conf.n_embd,
+            n_layer=conf.n_layer,
+            # Mamba specific parameters from conf
+            d_state=conf.d_state if hasattr(conf, 'd_state') else 16,
+            expand=conf.expand if hasattr(conf, 'expand') else 2,
+            dt_rank=conf.dt_rank if hasattr(conf, 'dt_rank') else 'auto',
+            d_conv=conf.d_conv if hasattr(conf, 'd_conv') else 4,
+            conv_bias=conf.conv_bias if hasattr(conf, 'conv_bias') else True,
+            bias=conf.bias if hasattr(conf, 'bias') else False, # Note: Mamba uses bias=False by default in Linear layers
         )
     else:
         raise NotImplementedError
@@ -218,6 +235,102 @@ class NanoGPTModel(nn.Module):
         # The shape of prediction is (bsize, 2*points, 1)
         # We only want predictions at the x positions (even indices)
         # And only for the specified inds
+        return prediction[:, ::2, 0][:, inds]
+
+# Mamba Wrapper Model for In-Context Learning
+class MambaICLModel(nn.Module):
+    def __init__(self, n_dims, n_positions, n_embd=128, n_layer=12,
+                 d_state=16, expand=2, dt_rank='auto', d_conv=4,
+                 conv_bias=True, bias=False):
+        super().__init__()
+        self.n_dims = n_dims
+        self.n_positions = n_positions
+        self.n_embd = n_embd
+        self.n_layer = n_layer
+        self.max_seq_len = 2 * n_positions
+
+        # Create ModelArgs instance
+        # Note: ModelArgs calculates d_inner and dt_rank_value in __post_init__
+        self.mamba_args = ModelArgs(
+            d_model=n_embd,
+            n_layer=n_layer, # Pass n_layer here, though not used by blocks directly
+            d_state=d_state,
+            expand=expand,
+            dt_rank=dt_rank,
+            d_conv=d_conv,
+            conv_bias=conv_bias,
+            bias=bias
+        )
+        # Manually trigger post_init logic if dataclass doesn't do it automatically
+        # (depends on Python version, safer to call explicitly)
+        if not hasattr(self.mamba_args, 'd_inner'):
+             self.mamba_args.__post_init__()
+
+        self.name = f"mamba_embd={n_embd}_layer={n_layer}_dstate={d_state}_expand={expand}_dconv={d_conv}"
+
+        # Input embedding layer
+        self._read_in = nn.Linear(n_dims, n_embd)
+        # Positional embedding layer
+        self._wpe = nn.Embedding(self.max_seq_len, n_embd)
+
+        # Mamba backbone layers (using ResidualBlock)
+        self.layers = nn.ModuleList([ResidualBlock(self.mamba_args) for _ in range(n_layer)])
+
+        # Final normalization layer (using RMSNorm from mamba_model)
+        self.norm_f = RMSNorm(n_embd)
+
+        # Output layer
+        self._read_out = nn.Linear(n_embd, 1)
+
+    @staticmethod
+    def _combine(xs_b, ys_b):
+        """Interleaves the x's and the y's into a single sequence."""
+        bsize, points, dim = xs_b.shape
+        ys_b_wide = torch.cat(
+            (
+                ys_b.view(bsize, points, 1),
+                torch.zeros(bsize, points, dim - 1, device=ys_b.device),
+            ),
+            axis=2,
+        )
+        zs = torch.stack((xs_b, ys_b_wide), dim=2)
+        zs = zs.view(bsize, 2 * points, dim)
+        return zs
+
+    def forward(self, xs, ys, inds=None):
+        if inds is None:
+            inds = torch.arange(ys.shape[1])
+        else:
+            inds = torch.tensor(inds)
+            if max(inds) >= ys.shape[1] or min(inds) < 0:
+                raise ValueError("inds contain indices where xs and ys are not defined")
+
+        bsize, points, dim = xs.shape
+        seq_len = 2 * points
+        device = xs.device
+
+        if seq_len > self.max_seq_len:
+             raise ValueError(f"Sequence length {seq_len} exceeds model max sequence length {self.max_seq_len}")
+
+        zs = self._combine(xs, ys) # (bsize, seq_len, n_dims)
+        hidden_states = self._read_in(zs) # (bsize, seq_len, n_embd)
+
+        # Add positional embeddings
+        pos = torch.arange(0, seq_len, dtype=torch.long, device=device) # shape (seq_len)
+        pos_emb = self._wpe(pos) # position embeddings of shape (seq_len, n_embd)
+        hidden_states = hidden_states + pos_emb # Add positional embeddings
+
+        # Pass through Mamba blocks (ResidualBlock includes norm -> mixer -> add)
+        for layer in self.layers:
+            hidden_states = layer(hidden_states)
+
+        # Apply final normalization
+        hidden_states = self.norm_f(hidden_states)
+
+        # Apply output layer
+        prediction = self._read_out(hidden_states) # (bsize, seq_len, 1)
+
+        # Extract predictions at x positions for specified inds
         return prediction[:, ::2, 0][:, inds]
 
 class NNModel:

@@ -14,15 +14,25 @@ from funcy import merge
 
 
 model_schema = {
-    "family": merge(tstring, allowed(["gpt2", "lstm", "nanogpt"])),
+    "family": merge(tstring, allowed(["gpt2", "lstm", "nanogpt", "mamba"])),
     "n_positions": merge(tinteger, required),  # maximum context length
     "n_dims": merge(tinteger, required),  # latent dimension
     "n_embd": merge(tinteger, required),
     "n_layer": merge(tinteger, required),
-    "n_head": merge(tinteger, required),
+    "n_head": merge(tinteger, nullable, default(None)),  # Nullable for Mamba
     # NanoGPT specific parameters
     "dropout": merge(tfloat, nullable, default(0.0)),
-    "bias": merge(tboolean, nullable, default(True)),
+    # General bias (used by NanoGPT, Mamba)
+    "bias": merge(
+        tboolean, nullable, default(False)
+    ),  # Defaulting to False as per Mamba
+    # Mamba specific parameters
+    "d_state": merge(tinteger, nullable, default(16)),
+    "expand": merge(tinteger, nullable, default(2)),
+    # dt_rank is now a string, either 'auto' or an integer string
+    "dt_rank": merge(tstring, nullable, default("auto")),
+    "d_conv": merge(tinteger, nullable, default(4)),
+    "conv_bias": merge(tboolean, nullable, default(True)),
 }
 
 curriculum_base_schema = {
