@@ -1,0 +1,17 @@
+inherit: 
+    - base.yaml
+
+training:
+    task: kernel_regression
+    task_kwargs: {"out_dim": 1}
+    curriculum:
+        points:
+            start: 1
+            end: 40
+            inc: 2
+            interval: 2000
+
+out_dir: ../models/kernel_regression
+
+wandb:
+    name: "kernel_regression_rbf"

@@ -8,8 +8,8 @@ import torch
 import yaml
 
 from eval import get_run_metrics
-from tasks import get_task_sampler
-from samplers import get_data_sampler
+from data import get_task_sampler
+from data import get_data_sampler
 from curriculum import Curriculum
 from schema import schema
 from models import build_model
@@ -81,6 +81,8 @@ def train(model, args):
             curriculum.n_dims_truncated,
             **data_sampler_args,
         )
+        if (args.training.task == "kernel_regression"):
+            task_sampler_args["n_points"] = curriculum.n_points
         task = task_sampler(**task_sampler_args)
         ys = task.evaluate(xs)
 
