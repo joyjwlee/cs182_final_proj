@@ -372,16 +372,72 @@ class DecisionTree(Task):
     def get_training_metric():
         return mean_squared_error
 
-class KernelRegression(LinearRegression):
-    def __init__(self, n_dims, batch_size, pool_dict=None, seeds=None):
-        super(KernelRegression, self).__init__(n_dims, batch_size, pool_dict=None, seeds=None)
+class KernelRegression(Task):
+    def __init__(self, n_dims, batch_size, n_points, out_dims, pool_dict=None, seeds=None):
+        """
+        Args:
+            n_points (int) : the size of the in context dataset
+            out_dims (int) : the output dimension of the kernel function
+        """
+        super(KernelRegression, self).__init__(n_dims, batch_size, pool_dict, seeds)
+
+        self.out_dims = out_dims 
+
+        if pool_dict is None and seed is None:
+            self.alphas = torch.randn(batch_size, n_points, out_dims)
+            self.vars = torch.randn(batch_size)**2
+        if seed is not None:
+            self.alphas = torch.zeros(batch_size, n_points, out_dims)
+            self.vars = torch.zeros(batch_size)
+            generator = torch.Generator()
+            assert len(seeds)==self.b_size
+            for i, seed in enumerate(seeds):
+                generator.manual_seed(seed)
+                self.alphas[i] = torch.randn(n_points, out_dims, generator=generator)
+                self.vars[i] = torch.randn(1, generator=generator)**2
+        else:
+            assert "alpha" in pool_dict and "vars" in pool_dict
+            assert len(pool_dict["alpha"]) == len(pool_dict["vars"])
+            indices = torch.randperm(len(pool_dict["alpha"]))[:batch_size]
+            self.alphas = pool_dict["alpha"][indices]
+            self.vars = pool_dict["vars"][indices]
+
+    def rbf_kernel(self, u, v, variance):
+        """
+        Implements the RBF kernel, k(u, v)=-exp{norm(u - v)^2 / (2*sigma)}
+
+        Args: 
+            u (torch.tensor) : the first input to the kernel
+            v (torch.tensor) : the second input to the kernel
+            variance (float) : the variance for this rbf
+        Returns:
+            np.ndarray : the output of the RBF Kernel function
+        """
+        return torch.exp(-torch.linalg.norm(u - v)**2 / 2 / variance)
 
     def evaluate(self, xs):
-        raise NotImplementedError
+        """
+        Args:
+            xs (torch.tensor) : the input tensor; shape = (batch_size, n_points, n_dims)
+        """
+        # Naive implementation, not vectorized
+        res = torch.zeros_like(xs.shape[0], xs.shape[1], self.out_dims)
+        for i in range(len(xs)): 
+            example = xs[i]
+            for j in range(len(example)):
+                for k in range(len(example)):
+                    # Need to find all pairwise distances
+                    # Use the alpha for the current batch and data point
+                    # Use the variance for the current batch
+                    res[i, j] += self.alphas[i, j] * self.rbf_kernel(example[j], example[k], self.vars[i])
+        return res
 
     @staticmethod
-    def generate_pool_dict(n_dims, num_tasks):
-        raise NotImplementedError
+    def generate_pool_dict(out_dims, num_tasks, n_points):
+        return {
+            "alpha": torch.randn(num_tasks, n_points, out_dims),
+            "vars": torch.randn(num_tasks)**2
+        }
 
     @staticmethod
     def get_metric():
