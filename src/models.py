@@ -10,6 +10,8 @@ import xgboost as xgb
 
 from base_models import NeuralNetwork, ParallelNetworks
 
+# Import custom NanoGPT
+from nanogpt_model import GPTConfig as NanoGPTConfig, GPT as NanoGPTCore
 
 def build_model(conf):
     if conf.family == "gpt2":
@@ -19,6 +21,18 @@ def build_model(conf):
             n_embd=conf.n_embd,
             n_layer=conf.n_layer,
             n_head=conf.n_head,
+        )
+    # Add NanoGPT option
+    elif conf.family == "nanogpt":
+        model = NanoGPTModel(
+            n_dims=conf.n_dims,
+            n_positions=conf.n_positions,
+            n_embd=conf.n_embd,
+            n_layer=conf.n_layer,
+            n_head=conf.n_head,
+            # Add other NanoGPT specific config e.g. dropout and bias
+            dropout=conf.dropout if hasattr(conf, 'dropout') else 0.0,
+            bias=conf.bias if hasattr(conf, 'bias') else True,
         )
     else:
         raise NotImplementedError
@@ -126,6 +140,85 @@ class TransformerModel(nn.Module):
         prediction = self._read_out(output)
         return prediction[:, ::2, 0][:, inds]  # predict only on xs
 
+# New NanoGPT Wrapper Model
+class NanoGPTModel(nn.Module):
+    def __init__(self, n_dims, n_positions, n_embd=128, n_layer=12, n_head=4, dropout=0.0, bias=True):
+        super().__init__()
+        # NanoGPT config expects block_size, which is the max sequence length
+        self.max_seq_len = 2 * n_positions
+        configuration = NanoGPTConfig(
+            block_size=self.max_seq_len,
+            n_embd=n_embd,
+            n_layer=n_layer,
+            n_head=n_head,
+            dropout=dropout,
+            bias=bias,
+            # vocab_size is not needed here
+        )
+        self.name = f"nanogpt_embd={n_embd}_layer={n_layer}_head={n_head}"
+        self.config = configuration
+
+        self.n_positions = n_positions
+        self.n_dims = n_dims
+
+        # Input embedding layer (maps n_dims to n_embd)
+        self._read_in = nn.Linear(n_dims, n_embd)
+        # Positional embedding layer (standard nn.Embedding)
+        self._wpe = nn.Embedding(self.max_seq_len, n_embd)
+        # The core NanoGPT transformer blocks
+        self._backbone = NanoGPTCore(configuration)
+        # Output layer (maps n_embd to 1)
+        self._read_out = nn.Linear(n_embd, 1)
+
+    @staticmethod
+    def _combine(xs_b, ys_b):
+        """Interleaves the x's and the y's into a single sequence."""
+        bsize, points, dim = xs_b.shape
+        ys_b_wide = torch.cat(
+            (
+                ys_b.view(bsize, points, 1),
+                torch.zeros(bsize, points, dim - 1, device=ys_b.device),
+            ),
+            axis=2,
+        )
+        zs = torch.stack((xs_b, ys_b_wide), dim=2)
+        zs = zs.view(bsize, 2 * points, dim)
+        return zs
+
+    def forward(self, xs, ys, inds=None):
+        if inds is None:
+            inds = torch.arange(ys.shape[1])
+        else:
+            inds = torch.tensor(inds)
+            if max(inds) >= ys.shape[1] or min(inds) < 0:
+                raise ValueError("inds contain indices where xs and ys are not defined")
+
+        bsize, points, dim = xs.shape
+        seq_len = 2 * points
+        device = xs.device
+
+        # Check if sequence length exceeds model's block size
+        if seq_len > self.config.block_size:
+            raise ValueError(f"Sequence length {seq_len} exceeds model block size {self.config.block_size}")
+
+        zs = self._combine(xs, ys) # Combine xs and ys -> (bsize, seq_len, n_dims)
+        embeds = self._read_in(zs) # Embed the combined sequence -> (bsize, seq_len, n_embd)
+
+        # Add positional embeddings
+        pos = torch.arange(0, seq_len, dtype=torch.long, device=device) # shape (seq_len)
+        pos_emb = self._wpe(pos) # position embeddings of shape (seq_len, n_embd)
+        embeds = embeds + pos_emb # Add positional embeddings -> (bsize, seq_len, n_embd)
+
+        # Pass through NanoGPT backbone
+        output = self._backbone(embeds) # -> (bsize, seq_len, n_embd)
+
+        # Apply output layer
+        prediction = self._read_out(output) # -> (bsize, seq_len, 1)
+
+        # The shape of prediction is (bsize, 2*points, 1)
+        # We only want predictions at the x positions (even indices)
+        # And only for the specified inds
+        return prediction[:, ::2, 0][:, inds]
 
 class NNModel:
     def __init__(self, n_neighbors, weights="uniform"):

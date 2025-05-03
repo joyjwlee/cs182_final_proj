@@ -14,7 +14,7 @@ from curriculum import Curriculum
 from schema import schema
 from models import build_model
 
-import wandb
+# import wandb
 
 torch.backends.cudnn.benchmark = True
 
@@ -100,19 +100,19 @@ def train(model, args):
             / curriculum.n_points
         )
 
-        if i % args.wandb.log_every_steps == 0 and not args.test_run:
-            wandb.log(
-                {
-                    "overall_loss": loss,
-                    "excess_loss": loss / baseline_loss,
-                    "pointwise/loss": dict(
-                        zip(point_wise_tags, point_wise_loss.cpu().numpy())
-                    ),
-                    "n_points": curriculum.n_points,
-                    "n_dims": curriculum.n_dims_truncated,
-                },
-                step=i,
-            )
+        # if i % args.wandb.log_every_steps == 0 and not args.test_run:
+        #     wandb.log(
+        #         {
+        #             "overall_loss": loss,
+        #             "excess_loss": loss / baseline_loss,
+        #             "pointwise/loss": dict(
+        #                 zip(point_wise_tags, point_wise_loss.cpu().numpy())
+        #             ),
+        #             "n_points": curriculum.n_points,
+        #             "n_dims": curriculum.n_dims_truncated,
+        #         },
+        #         step=i,
+        #     )
 
         curriculum.update()
 
@@ -140,16 +140,16 @@ def main(args):
         curriculum_args.points.start = curriculum_args.points.end
         curriculum_args.dims.start = curriculum_args.dims.end
         args.training.train_steps = 100
-    else:
-        wandb.init(
-            dir=args.out_dir,
-            project=args.wandb.project,
-            entity=args.wandb.entity,
-            config=args.__dict__,
-            notes=args.wandb.notes,
-            name=args.wandb.name,
-            resume=True,
-        )
+    # else:
+    #     wandb.init(
+    #         dir=args.out_dir,
+    #         project=args.wandb.project,
+    #         entity=args.wandb.entity,
+    #         config=args.__dict__,
+    #         notes=args.wandb.notes,
+    #         name=args.wandb.name,
+    #         resume=True,
+    #     )
 
     model = build_model(args.model)
     model.cuda()
@@ -164,7 +164,7 @@ def main(args):
 if __name__ == "__main__":
     parser = QuinineArgumentParser(schema=schema)
     args = parser.parse_quinfig()
-    assert args.model.family in ["gpt2", "lstm"]
+    assert args.model.family in ["gpt2", "lstm", "nanogpt"]
     print(f"Running with: {args}")
 
     if not args.test_run:
