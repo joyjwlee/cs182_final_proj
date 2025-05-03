@@ -105,9 +105,11 @@ class LinearRegression(Task):
         super(LinearRegression, self).__init__(n_dims, batch_size, pool_dict, seeds)
         self.scale = scale
 
+        # If no weights are specified, generate them
         if pool_dict is None and seeds is None:
             self.w_b = torch.randn(self.b_size, self.n_dims, 1)
         elif seeds is not None:
+            # Generate weights in each batch with the seed
             self.w_b = torch.zeros(self.b_size, self.n_dims, 1)
             generator = torch.Generator()
             assert len(seeds) == self.b_size
@@ -115,6 +117,7 @@ class LinearRegression(Task):
                 generator.manual_seed(seed)
                 self.w_b[i] = torch.randn(self.n_dims, 1, generator=generator)
         else:
+            # If there are weights specified, extract them randomly
             assert "w" in pool_dict
             indices = torch.randperm(len(pool_dict["w"]))[:batch_size]
             self.w_b = pool_dict["w"][indices]
@@ -382,8 +385,8 @@ class KernelRegression(LinearRegression):
 
     @staticmethod
     def get_metric():
-        raise NotImplementedError
+        return squared_error
 
     @staticmethod
     def get_training_metric():
-        raise NotImplementedError
+        raise mean_squared_error

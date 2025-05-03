@@ -7,12 +7,12 @@ We will be exploring In-Context Learning (ICL) discussed in the paper ["What Can
 # Environment Setup
 Installing the necessary packages
 ```
-conda env create -f env.yml
+conda env create -f environment.yml
 ```
 
 Setting up the jupyter notebook kernel for `eval.ipynb`
 ```
-python -m ipykernel install --user --name=kernel_icl
+python -m ipykernel install --user --name=in-context-learning
 ```
 
 # Reproducing Results

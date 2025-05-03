@@ -7,7 +7,7 @@ dependencies:
   - python=3.8.12
   - pytorch=1.11.0
   - pip:
-    - jupyter==1.0.0
+    - ipykernel==6.29.5
     - matplotlib==3.5.2
     - numpy==1.22.3
     - pandas==1.4.2
