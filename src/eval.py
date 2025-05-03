@@ -10,8 +10,8 @@ import torch
 import yaml
 
 import models
-from samplers import get_data_sampler, sample_transformation
-from tasks import get_task_sampler
+from data.data_sampler import get_data_sampler, sample_transformation
+from data.tasks import get_task_sampler
 
 
 def get_model_from_run(run_path, step=-1, only_conf=False):
@@ -319,7 +319,6 @@ def get_run_metrics(
     return all_metrics
 
 
-
 def conf_to_model_name(conf):
     if conf.model.family == "gpt2":
         return {
@@ -388,6 +387,7 @@ def read_run_dir(run_dir):
     df = pd.DataFrame(all_runs).sort_values("run_name")
     assert len(df) == len(df.run_name.unique())
     return df
+
 
 if __name__ == "__main__":
     run_dir = sys.argv[1]

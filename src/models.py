@@ -16,6 +16,7 @@ from nanogpt_model import GPTConfig as NanoGPTConfig, GPT as NanoGPTCore
 # Import custom Mamba (using minimal version)
 from mamba_model import ModelArgs, ResidualBlock, RMSNorm
 
+
 def build_model(conf):
     if conf.family == "gpt2":
         model = TransformerModel(
@@ -34,8 +35,8 @@ def build_model(conf):
             n_layer=conf.n_layer,
             n_head=conf.n_head,
             # Add other NanoGPT specific config e.g. dropout and bias
-            dropout=conf.dropout if hasattr(conf, 'dropout') else 0.0,
-            bias=conf.bias if hasattr(conf, 'bias') else True,
+            dropout=conf.dropout if hasattr(conf, "dropout") else 0.0,
+            bias=conf.bias if hasattr(conf, "bias") else True,
         )
     elif conf.family == "mamba":
         model = MambaICLModel(
@@ -44,12 +45,14 @@ def build_model(conf):
             n_embd=conf.n_embd,
             n_layer=conf.n_layer,
             # Mamba specific parameters from conf
-            d_state=conf.d_state if hasattr(conf, 'd_state') else 16,
-            expand=conf.expand if hasattr(conf, 'expand') else 2,
-            dt_rank=conf.dt_rank if hasattr(conf, 'dt_rank') else 'auto',
-            d_conv=conf.d_conv if hasattr(conf, 'd_conv') else 4,
-            conv_bias=conf.conv_bias if hasattr(conf, 'conv_bias') else True,
-            bias=conf.bias if hasattr(conf, 'bias') else False, # Note: Mamba uses bias=False by default in Linear layers
+            d_state=conf.d_state if hasattr(conf, "d_state") else 16,
+            expand=conf.expand if hasattr(conf, "expand") else 2,
+            dt_rank=conf.dt_rank if hasattr(conf, "dt_rank") else "auto",
+            d_conv=conf.d_conv if hasattr(conf, "d_conv") else 4,
+            conv_bias=conf.conv_bias if hasattr(conf, "conv_bias") else True,
+            bias=(
+                conf.bias if hasattr(conf, "bias") else False
+            ),  # Note: Mamba uses bias=False by default in Linear layers
         )
     else:
         raise NotImplementedError
@@ -157,9 +160,19 @@ class TransformerModel(nn.Module):
         prediction = self._read_out(output)
         return prediction[:, ::2, 0][:, inds]  # predict only on xs
 
+
 # New NanoGPT Wrapper Model
 class NanoGPTModel(nn.Module):
-    def __init__(self, n_dims, n_positions, n_embd=128, n_layer=12, n_head=4, dropout=0.0, bias=True):
+    def __init__(
+        self,
+        n_dims,
+        n_positions,
+        n_embd=128,
+        n_layer=12,
+        n_head=4,
+        dropout=0.0,
+        bias=True,
+    ):
         super().__init__()
         # NanoGPT config expects block_size, which is the max sequence length
         self.max_seq_len = 2 * n_positions
@@ -216,32 +229,51 @@ class NanoGPTModel(nn.Module):
 
         # Check if sequence length exceeds model's block size
         if seq_len > self.config.block_size:
-            raise ValueError(f"Sequence length {seq_len} exceeds model block size {self.config.block_size}")
+            raise ValueError(
+                f"Sequence length {seq_len} exceeds model block size {self.config.block_size}"
+            )
 
-        zs = self._combine(xs, ys) # Combine xs and ys -> (bsize, seq_len, n_dims)
-        embeds = self._read_in(zs) # Embed the combined sequence -> (bsize, seq_len, n_embd)
+        zs = self._combine(xs, ys)  # Combine xs and ys -> (bsize, seq_len, n_dims)
+        embeds = self._read_in(
+            zs
+        )  # Embed the combined sequence -> (bsize, seq_len, n_embd)
 
         # Add positional embeddings
-        pos = torch.arange(0, seq_len, dtype=torch.long, device=device) # shape (seq_len)
-        pos_emb = self._wpe(pos) # position embeddings of shape (seq_len, n_embd)
-        embeds = embeds + pos_emb # Add positional embeddings -> (bsize, seq_len, n_embd)
+        pos = torch.arange(
+            0, seq_len, dtype=torch.long, device=device
+        )  # shape (seq_len)
+        pos_emb = self._wpe(pos)  # position embeddings of shape (seq_len, n_embd)
+        embeds = (
+            embeds + pos_emb
+        )  # Add positional embeddings -> (bsize, seq_len, n_embd)
 
         # Pass through NanoGPT backbone
-        output = self._backbone(embeds) # -> (bsize, seq_len, n_embd)
+        output = self._backbone(embeds)  # -> (bsize, seq_len, n_embd)
 
         # Apply output layer
-        prediction = self._read_out(output) # -> (bsize, seq_len, 1)
+        prediction = self._read_out(output)  # -> (bsize, seq_len, 1)
 
         # The shape of prediction is (bsize, 2*points, 1)
         # We only want predictions at the x positions (even indices)
         # And only for the specified inds
         return prediction[:, ::2, 0][:, inds]
 
+
 # Mamba Wrapper Model for In-Context Learning
 class MambaICLModel(nn.Module):
-    def __init__(self, n_dims, n_positions, n_embd=128, n_layer=12,
-                 d_state=16, expand=2, dt_rank='auto', d_conv=4,
-                 conv_bias=True, bias=False):
+    def __init__(
+        self,
+        n_dims,
+        n_positions,
+        n_embd=128,
+        n_layer=12,
+        d_state=16,
+        expand=2,
+        dt_rank="auto",
+        d_conv=4,
+        conv_bias=True,
+        bias=False,
+    ):
         super().__init__()
         self.n_dims = n_dims
         self.n_positions = n_positions
@@ -253,18 +285,18 @@ class MambaICLModel(nn.Module):
         # Note: ModelArgs calculates d_inner and dt_rank_value in __post_init__
         self.mamba_args = ModelArgs(
             d_model=n_embd,
-            n_layer=n_layer, # Pass n_layer here, though not used by blocks directly
+            n_layer=n_layer,  # Pass n_layer here, though not used by blocks directly
             d_state=d_state,
             expand=expand,
             dt_rank=dt_rank,
             d_conv=d_conv,
             conv_bias=conv_bias,
-            bias=bias
+            bias=bias,
         )
         # Manually trigger post_init logic if dataclass doesn't do it automatically
         # (depends on Python version, safer to call explicitly)
-        if not hasattr(self.mamba_args, 'd_inner'):
-             self.mamba_args.__post_init__()
+        if not hasattr(self.mamba_args, "d_inner"):
+            self.mamba_args.__post_init__()
 
         self.name = f"mamba_embd={n_embd}_layer={n_layer}_dstate={d_state}_expand={expand}_dconv={d_conv}"
 
@@ -274,7 +306,9 @@ class MambaICLModel(nn.Module):
         self._wpe = nn.Embedding(self.max_seq_len, n_embd)
 
         # Mamba backbone layers (using ResidualBlock)
-        self.layers = nn.ModuleList([ResidualBlock(self.mamba_args) for _ in range(n_layer)])
+        self.layers = nn.ModuleList(
+            [ResidualBlock(self.mamba_args) for _ in range(n_layer)]
+        )
 
         # Final normalization layer (using RMSNorm from mamba_model)
         self.norm_f = RMSNorm(n_embd)
@@ -310,15 +344,19 @@ class MambaICLModel(nn.Module):
         device = xs.device
 
         if seq_len > self.max_seq_len:
-             raise ValueError(f"Sequence length {seq_len} exceeds model max sequence length {self.max_seq_len}")
+            raise ValueError(
+                f"Sequence length {seq_len} exceeds model max sequence length {self.max_seq_len}"
+            )
 
-        zs = self._combine(xs, ys) # (bsize, seq_len, n_dims)
-        hidden_states = self._read_in(zs) # (bsize, seq_len, n_embd)
+        zs = self._combine(xs, ys)  # (bsize, seq_len, n_dims)
+        hidden_states = self._read_in(zs)  # (bsize, seq_len, n_embd)
 
         # Add positional embeddings
-        pos = torch.arange(0, seq_len, dtype=torch.long, device=device) # shape (seq_len)
-        pos_emb = self._wpe(pos) # position embeddings of shape (seq_len, n_embd)
-        hidden_states = hidden_states + pos_emb # Add positional embeddings
+        pos = torch.arange(
+            0, seq_len, dtype=torch.long, device=device
+        )  # shape (seq_len)
+        pos_emb = self._wpe(pos)  # position embeddings of shape (seq_len, n_embd)
+        hidden_states = hidden_states + pos_emb  # Add positional embeddings
 
         # Pass through Mamba blocks (ResidualBlock includes norm -> mixer -> add)
         for layer in self.layers:
@@ -328,10 +366,11 @@ class MambaICLModel(nn.Module):
         hidden_states = self.norm_f(hidden_states)
 
         # Apply output layer
-        prediction = self._read_out(hidden_states) # (bsize, seq_len, 1)
+        prediction = self._read_out(hidden_states)  # (bsize, seq_len, 1)
 
         # Extract predictions at x positions for specified inds
         return prediction[:, ::2, 0][:, inds]
+
 
 class NNModel:
     def __init__(self, n_neighbors, weights="uniform"):
