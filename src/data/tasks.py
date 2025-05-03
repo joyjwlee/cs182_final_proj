@@ -373,7 +373,7 @@ class DecisionTree(Task):
         return mean_squared_error
 
 class KernelRegression(Task):
-    def __init__(self, n_dims, batch_size, n_points, out_dims, pool_dict=None, seeds=None):
+    def __init__(self, n_dims, batch_size, pool_dict=None, seeds=None, n_points=None, out_dims=None):
         """
         Args:
             n_points (int) : the size of the in context dataset
