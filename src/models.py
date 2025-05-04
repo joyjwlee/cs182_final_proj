@@ -456,7 +456,7 @@ class LeastSquaresModel:
 class KernelLinearRegressionModel:
     def __init__(self, driver=None):
         self.driver = driver
-        self.name = f"kernelridge_driver={driver}"
+        self.name = f"kernelregression_driver={driver}"
         self.lam = 1e-3
         self.sigma= 1
 
