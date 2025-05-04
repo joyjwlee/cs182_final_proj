@@ -383,10 +383,10 @@ class KernelRegression(Task):
 
         self.out_dims = out_dims 
 
-        if pool_dict is None and seed is None:
+        if pool_dict is None and seeds is None:
             self.alphas = torch.randn(batch_size, n_points, out_dims)
             self.vars = torch.randn(batch_size)**2
-        if seed is not None:
+        elif seeds is not None:
             self.alphas = torch.zeros(batch_size, n_points, out_dims)
             self.vars = torch.zeros(batch_size)
             generator = torch.Generator()
@@ -418,10 +418,15 @@ class KernelRegression(Task):
     def evaluate(self, xs):
         """
         Args:
-            xs (torch.tensor) : the input tensor; shape = (batch_size, n_points, n_dims)
+            xs (torch.Tensor) : the input tensor; shape = (batch_size, n_points, n_dims)
+        Returns:
+            torch.Tensor : the output tensor for a kernel linear function; shape = (batch-size, n_points, n_dims)
         """
         # Naive implementation, not vectorized
-        res = torch.zeros_like(xs.shape[0], xs.shape[1], self.out_dims)
+        res = torch.zeros(xs.shape[0], xs.shape[1], self.out_dims)
+        # Move the tensors to the same device
+        alphas = self.alphas.to(xs.device)
+        variances = self.vars.to(xs.device)
         for i in range(len(xs)): 
             example = xs[i]
             for j in range(len(example)):
@@ -429,11 +434,12 @@ class KernelRegression(Task):
                     # Need to find all pairwise distances
                     # Use the alpha for the current batch and data point
                     # Use the variance for the current batch
-                    res[i, j] += self.alphas[i, j] * self.rbf_kernel(example[j], example[k], self.vars[i])
-        return res
+                    res[i, j] += alphas[i, j] * self.rbf_kernel(example[j], example[k], variances[i])
+        return res[:, :, 0]
 
     @staticmethod
-    def generate_pool_dict(out_dims, num_tasks, n_points):
+    def generate_pool_dict(n_dims, num_tasks, out_dims=None, n_points=None, **kwargs):
+        print("HEY"*50)
         return {
             "alpha": torch.randn(num_tasks, n_points, out_dims),
             "vars": torch.randn(num_tasks)**2
@@ -445,4 +451,4 @@ class KernelRegression(Task):
 
     @staticmethod
     def get_training_metric():
-        raise mean_squared_error
+        return mean_squared_error
