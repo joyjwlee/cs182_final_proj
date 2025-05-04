@@ -6,7 +6,7 @@ inherit:
 model:
   family: "mamba"
   n_dims: 20
-  n_positions: 41
+  n_positions: 101
   n_embd: 128
   n_layer: 4
   # Mamba specific params (using defaults from mamba_model.py)
@@ -20,12 +20,12 @@ model:
 training:
     task: kernel_regression # Example task
     data: gaussian          # Example data distribution
-    task_kwargs: {"out_dims": 1}         # Task-specific arguments
+    task_kwargs: {}         # Task-specific arguments
     batch_size: 64
     learning_rate: 0.0001
     save_every_steps: 1000
     keep_every_steps: 100000
-    train_steps: 5001       # Match toy.yaml for comparison
+    train_steps: 500001       # Match toy.yaml for comparison
     curriculum:             # Keep curriculum same as toy.yaml for comparison
         dims:
             start: 5
