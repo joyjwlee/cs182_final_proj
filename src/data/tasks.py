@@ -373,27 +373,24 @@ class DecisionTree(Task):
         return mean_squared_error
 
 class KernelRegression(Task):
-    def __init__(self, n_dims, batch_size, pool_dict=None, seeds=None, n_points=None, out_dims=None):
+    def __init__(self, n_dims, batch_size, pool_dict=None, seeds=None, n_points=None):
         """
         Args:
             n_points (int) : the size of the in context dataset
-            out_dims (int) : the output dimension of the kernel function
         """
         super(KernelRegression, self).__init__(n_dims, batch_size, pool_dict, seeds)
 
-        self.out_dims = out_dims 
-
         if pool_dict is None and seeds is None:
-            self.alphas = torch.randn(batch_size, n_points, out_dims)
+            self.alphas = torch.randn(batch_size, n_points)
             self.vars = torch.randn(batch_size)**2
         elif seeds is not None:
-            self.alphas = torch.zeros(batch_size, n_points, out_dims)
+            self.alphas = torch.zeros(batch_size, n_points)
             self.vars = torch.zeros(batch_size)
             generator = torch.Generator()
             assert len(seeds)==self.b_size
             for i, seed in enumerate(seeds):
                 generator.manual_seed(seed)
-                self.alphas[i] = torch.randn(n_points, out_dims, generator=generator)
+                self.alphas[i] = torch.randn(n_points, generator=generator)
                 self.vars[i] = torch.randn(1, generator=generator)**2
         else:
             assert "alpha" in pool_dict and "vars" in pool_dict
@@ -423,7 +420,7 @@ class KernelRegression(Task):
             torch.Tensor : the output tensor for a kernel linear function; shape = (batch-size, n_points, n_dims)
         """
         # Naive implementation, not vectorized
-        res = torch.zeros(xs.shape[0], xs.shape[1], self.out_dims)
+        res = torch.zeros(xs.shape[0], xs.shape[1])
         # Move the tensors to the same device
         alphas = self.alphas.to(xs.device)
         variances = self.vars.to(xs.device)
@@ -435,13 +432,12 @@ class KernelRegression(Task):
                     # Use the alpha for the current batch and data point
                     # Use the variance for the current batch
                     res[i, j] += alphas[i, j] * self.rbf_kernel(example[j], example[k], variances[i])
-        return res[:, :, 0]
+        return res
 
     @staticmethod
-    def generate_pool_dict(n_dims, num_tasks, out_dims=None, n_points=None, **kwargs):
-        print("HEY"*50)
+    def generate_pool_dict(n_dims, num_tasks, n_points=None, **kwargs):
         return {
-            "alpha": torch.randn(num_tasks, n_points, out_dims),
+            "alpha": torch.randn(num_tasks, n_points),
             "vars": torch.randn(num_tasks)**2
         }
 

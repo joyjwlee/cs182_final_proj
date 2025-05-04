@@ -62,11 +62,6 @@ def build_model(conf):
 
 def get_relevant_baselines(task_name):
     task_to_baselines = {
-        "kernel_regression": [
-            (LeastSquaresModel, {}),
-            (NNModel, {"n_neighbors": 3}),
-            (KernelRidgeRegressionModel, {}),
-        ],
         "linear_regression": [
             (LeastSquaresModel, {}),
             (NNModel, {"n_neighbors": 3}),
@@ -110,6 +105,12 @@ def get_relevant_baselines(task_name):
             (XGBoostModel, {}),
             (AveragingModel, {}),
         ],
+        "kernel_regression": [
+            (LeastSquaresModel, {}),
+            (NNModel, {"n_neighbors": 3}),
+            (AveragingModel, {}),
+            (KernelLinearRegressionModel, {})
+        ]
     }
 
     models = [model_cls(**kwargs) for model_cls, kwargs in task_to_baselines[task_name]]
@@ -435,7 +436,6 @@ class LeastSquaresModel:
                 raise ValueError("inds contain indices where xs and ys are not defined")
 
         preds = []
-
         for i in inds:
             if i == 0:
                 preds.append(torch.zeros_like(ys[:, 0]))  # predict zero for first point
@@ -453,12 +453,12 @@ class LeastSquaresModel:
         return torch.stack(preds, dim=1)
     
 # Kenny: Kernel Ridge Regression
-class KernelRidgeRegressionModel:
+class KernelLinearRegressionModel:
     def __init__(self, driver=None):
         self.driver = driver
         self.name = f"kernelridge_driver={driver}"
         self.lam = 1e-3
-        self.gamma = 0.1
+        self.sigma= 1
 
     def __call__(self, xs, ys, inds=None):
         xs, ys = xs.cpu(), ys.cpu()
@@ -474,32 +474,36 @@ class KernelRidgeRegressionModel:
             if i == 0:
                 preds.append(torch.zeros_like(ys[:, 0]))  # predict zero for first point
                 continue
-            train_xs, train_ys = xs[:, :i].T, ys[:, :i].T # [i, d], [i, batch]
+            train_xs, train_ys = xs[:, :i].T, ys[:, :i].T # [d, i, batch], [i, batch]
             test_x = xs[:, i : i + 1].T # [1, d]
 
-            K = self.rbf_kernel(train_xs.T, train_xs.T) # [i, i]
-            k = self.rbf_kernel(train_xs.T, test_x.T) # [i, 1]
+            # Step 1: Calcualte the Kernel Matrix
+            K = self.rbf_kernel(train_xs.T, train_xs.T) # [batch, i, i]
+            # Calculate the kernel values for the test
+            k = self.rbf_kernel(train_xs.T, test_x.T) # [batch, i, 1]
 
-            I = torch.eye(K.shape[0])
-            alpha = torch.linalg.solve(K + self.lam * I, train_ys) # [i, batch]
+            I = torch.eye(K.shape[1]).unsqueeze(0).repeat(K.shape[0], 1, 1)
+            alpha = torch.linalg.solve(K + self.lam * I, train_ys.T) # [batch, i]
 
-            pred = k.T @ alpha # [1, batch]
-
-            # ws, _, _, _ = torch.linalg.lstsq(
-            #     train_xs, train_ys.unsqueeze(2), driver=self.driver
-            # )
-            # pred = test_x @ ws
-            
-            preds.append(pred[:, 0, 0])
+            pred = (k.squeeze(-1) * alpha.squeeze(-1)).sum(dim=1) # [batch,]
+            preds.append(pred)
 
         return torch.stack(preds, dim=1)
     
     def rbf_kernel(self, x1, x2):
-        # chat: x1 [d, n], x2 [d, m]
-        x1, x2 = x1.T, x2.T # [n, d], [m, d]
-        diff = x1.unsqueeze(1) - x2.unsqueeze(0) # [n, m, d]
-        dists = (diff ** 2).sum(-1) # [n, m]
-        return torch.exp(-self.gamma * dists)
+        # x1, x2: [d, n1/2, batch]
+        # squared norms
+        x1_norm = (x1 ** 2).sum(dim=2, keepdim=True)       # → (B, n1, 1)
+        x2_norm = (x2 ** 2).sum(dim=2, keepdim=True).transpose(1, 2)  # → (B, 1, n2)
+
+        # cross‐term
+        cross = torch.bmm(x1, x2.transpose(1, 2))          # → (B, n1, n2)
+
+        # pairwise squared distances
+        d2 = x1_norm + x2_norm - 2.0 * cross
+
+        # RBF
+        return torch.exp(-d2 / (2.0 * self.sigma))
 
 
 class AveragingModel:

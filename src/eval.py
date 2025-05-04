@@ -40,7 +40,7 @@ def get_model_from_run(run_path, step=-1, only_conf=False):
 
 def eval_batch(model, task_sampler, xs, xs_p=None):
     task = task_sampler()
-    if torch.cuda.is_available() and model.name.split("_")[0] in ["gpt2", "lstm"]:
+    if torch.cuda.is_available() and model.name.split("_")[0] in ["gpt2", "lstm", "nanogpt", "mamba"]:
         device = "cuda"
     else:
         device = "cpu"
@@ -155,7 +155,7 @@ def eval_model(
     n_dims,
     n_points,
     prompting_strategy,
-    num_eval_examples=1280,
+    num_eval_examples= 1280,
     batch_size=64,
     data_sampler_kwargs={},
     task_sampler_kwargs={},
@@ -168,7 +168,6 @@ def eval_model(
        - num_eval_examples: total number of examples to evaluate on
        - **sampler_kwargs: remaining arguments to pass directly to the sampler
     """
-
     assert num_eval_examples % batch_size == 0
     data_sampler = get_data_sampler(data_name, n_dims, **data_sampler_kwargs)
     task_sampler = get_task_sampler(
@@ -216,6 +215,12 @@ def build_evals(conf):
             # allow kwargs to override base_kwargs values
             evaluation_kwargs[name] = base_kwargs.copy()
             evaluation_kwargs[name].update(kwargs)
+
+        # For Kernel Linear Regression
+        if task_name == "kernel_regression":
+            evaluation_kwargs["standard"]["task_sampler_kwargs"] = {
+                "n_points": evaluation_kwargs["standard"]["n_points"]
+            }
         return evaluation_kwargs
 
     for strategy in [
