@@ -34,7 +34,7 @@ training:
             inc: 2
             interval: 2000
 
-out_dir: ../models/kernel_regression/ # Separate output directory
+out_dir: ../models/kernel_regression/nanogpt # Separate output directory
 
 wandb:
     name: "nanogpt_kernel_regression" # Unique wandb run name
