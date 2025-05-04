@@ -62,6 +62,11 @@ def build_model(conf):
 
 def get_relevant_baselines(task_name):
     task_to_baselines = {
+        "kernel_regression": [
+            (LeastSquaresModel, {}),
+            (NNModel, {"n_neighbors": 3}),
+            (KernelRidgeRegressionModel, {}),
+        ],
         "linear_regression": [
             (LeastSquaresModel, {}),
             (NNModel, {"n_neighbors": 3}),
@@ -446,6 +451,55 @@ class LeastSquaresModel:
             preds.append(pred[:, 0, 0])
 
         return torch.stack(preds, dim=1)
+    
+# Kenny: Kernel Ridge Regression
+class KernelRidgeRegressionModel:
+    def __init__(self, driver=None):
+        self.driver = driver
+        self.name = f"kernelridge_driver={driver}"
+        self.lam = 1e-3
+        self.gamma = 0.1
+
+    def __call__(self, xs, ys, inds=None):
+        xs, ys = xs.cpu(), ys.cpu()
+        if inds is None:
+            inds = range(ys.shape[1])
+        else:
+            if max(inds) >= ys.shape[1] or min(inds) < 0:
+                raise ValueError("inds contain indices where xs and ys are not defined")
+
+        preds = []
+
+        for i in inds:
+            if i == 0:
+                preds.append(torch.zeros_like(ys[:, 0]))  # predict zero for first point
+                continue
+            train_xs, train_ys = xs[:, :i].T, ys[:, :i].T # [i, d], [i, batch]
+            test_x = xs[:, i : i + 1].T # [1, d]
+
+            K = self.rbf_kernel(train_xs.T, train_xs.T) # [i, i]
+            k = self.rbf_kernel(train_xs.T, test_x.T) # [i, 1]
+
+            I = torch.eye(K.shape[0])
+            alpha = torch.linalg.solve(K + self.lam * I, train_ys) # [i, batch]
+
+            pred = k.T @ alpha # [1, batch]
+
+            # ws, _, _, _ = torch.linalg.lstsq(
+            #     train_xs, train_ys.unsqueeze(2), driver=self.driver
+            # )
+            # pred = test_x @ ws
+            
+            preds.append(pred[:, 0, 0])
+
+        return torch.stack(preds, dim=1)
+    
+    def rbf_kernel(self, x1, x2):
+        # chat: x1 [d, n], x2 [d, m]
+        x1, x2 = x1.T, x2.T # [n, d], [m, d]
+        diff = x1.unsqueeze(1) - x2.unsqueeze(0) # [n, m, d]
+        dists = (diff ** 2).sum(-1) # [n, m]
+        return torch.exp(-self.gamma * dists)
 
 
 class AveragingModel:
