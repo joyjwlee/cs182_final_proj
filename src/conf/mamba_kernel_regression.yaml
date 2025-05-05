@@ -5,17 +5,10 @@ inherit:
 
 model:
   family: "mamba"
-<<<<<<< HEAD
   n_dims: 5
   n_positions: 101
   n_embd: 256
   n_layer: 12
-=======
-  n_dims: 20
-  n_positions: 101
-  n_embd: 128
-  n_layer: 4
->>>>>>> [eval] move src out
   # Mamba specific params (using defaults from mamba_model.py)
   d_state: 16
   expand: 2
@@ -32,11 +25,7 @@ training:
     learning_rate: 0.0001
     save_every_steps: 1000
     keep_every_steps: 100000
-<<<<<<< HEAD
     train_steps: 1001       # Match toy.yaml for comparison
-=======
-    train_steps: 500001       # Match toy.yaml for comparison
->>>>>>> [eval] move src out
     curriculum:             # Keep curriculum same as toy.yaml for comparison
         dims:
             start: 5
@@ -47,17 +36,9 @@ training:
             start: 10
             end: 40
             inc: 2
-<<<<<<< HEAD
             interval: 50
-=======
-            interval: 2000
->>>>>>> [eval] move src out
 
 out_dir: "../models/kernel_regression/mamba"
 
 wandb:
-<<<<<<< HEAD
   name: mamba_kernel_regression
-=======
-  name: mamba_toy
->>>>>>> [eval] move src out

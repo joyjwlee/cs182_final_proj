@@ -4,18 +4,10 @@ This code was based off of the Garg et. al Paper (2022)
 Creates the classes for data generation
 """
 
-<<<<<<< HEAD
-
-=======
->>>>>>> [eval] move src out
 import math
 
 import torch
 
-<<<<<<< HEAD
-=======
-
->>>>>>> [eval] move src out
 ##################################################
 ################# Loss Functions #################
 ##################################################
@@ -33,20 +25,11 @@ def accuracy(ys_pred, ys):
 
 sigmoid = torch.nn.Sigmoid()
 bce_loss = torch.nn.BCELoss()
-<<<<<<< HEAD
-=======
-
-
->>>>>>> [eval] move src out
 def cross_entropy(ys_pred, ys):
     output = sigmoid(ys_pred)
     target = (ys + 1) / 2
     return bce_loss(output, target)
 
-<<<<<<< HEAD
-=======
-
->>>>>>> [eval] move src out
 ##################################################
 ############ ICL Task Abstract Class #############
 ##################################################
@@ -85,11 +68,7 @@ def get_task_sampler(
         n_dims (int) : the number of dimensiosn per data point in the task
         batch_size (int) : the batch size
         pool_dict (torch.Tensor) : any weights that are needed for the task
-<<<<<<< HEAD
         num_tasks (int) : the number of examples to generate; will create a new weight for each example 
-=======
-        num_tasks (int) : the number of examples to generate; will create a new weight for each example
->>>>>>> [eval] move src out
                           (corresponds to a new function from the given family of functions)
     Returns:
         Callable(**args) : function that accepts args to create a task class
@@ -103,12 +82,8 @@ def get_task_sampler(
         "quadratic_regression": QuadraticRegression,
         "relu_2nn_regression": Relu2nnRegression,
         "decision_tree": DecisionTree,
-<<<<<<< HEAD
-        "kernel_regression" : KernelRegression
-=======
         "kernel_regression": KernelRegression,
         "noisy_kernel_regression": NoisyKernelRegression,
->>>>>>> [eval] move src out
     }
     if task_name in task_names_to_classes:
         task_cls = task_names_to_classes[task_name]
@@ -121,10 +96,6 @@ def get_task_sampler(
         print("Unknown task")
         raise NotImplementedError
 
-<<<<<<< HEAD
-=======
-
->>>>>>> [eval] move src out
 ##################################################
 ################ ICL Task Classes ################
 ##################################################
@@ -401,10 +372,6 @@ class DecisionTree(Task):
     def get_training_metric():
         return mean_squared_error
 
-<<<<<<< HEAD
-=======
-
->>>>>>> [eval] move src out
 class KernelRegression(Task):
     def __init__(self, n_dims, batch_size, pool_dict=None, seeds=None, n_points=None):
         """
@@ -415,28 +382,16 @@ class KernelRegression(Task):
 
         if pool_dict is None and seeds is None:
             self.alphas = torch.randn(batch_size, n_points)
-<<<<<<< HEAD
             self.vars = torch.randn(batch_size)**2
-=======
-            self.vars = torch.randn(batch_size) ** 2
->>>>>>> [eval] move src out
         elif seeds is not None:
             self.alphas = torch.zeros(batch_size, n_points)
             self.vars = torch.zeros(batch_size)
             generator = torch.Generator()
-<<<<<<< HEAD
             assert len(seeds)==self.b_size
             for i, seed in enumerate(seeds):
                 generator.manual_seed(seed)
                 self.alphas[i] = torch.randn(n_points, generator=generator)
                 self.vars[i] = torch.randn(1, generator=generator)**2
-=======
-            assert len(seeds) == self.b_size
-            for i, seed in enumerate(seeds):
-                generator.manual_seed(seed)
-                self.alphas[i] = torch.randn(n_points, generator=generator)
-                self.vars[i] = torch.randn(1, generator=generator) ** 2
->>>>>>> [eval] move src out
         else:
             assert "alpha" in pool_dict and "vars" in pool_dict
             assert len(pool_dict["alpha"]) == len(pool_dict["vars"])
@@ -448,26 +403,14 @@ class KernelRegression(Task):
         """
         Implements the RBF kernel, k(u, v)=-exp{norm(u - v)^2 / (2*sigma)}
 
-<<<<<<< HEAD
         Args: 
-=======
-        Args:
->>>>>>> [eval] move src out
             u (torch.tensor) : the first input to the kernel
             v (torch.tensor) : the second input to the kernel
             variance (float) : the variance for this rbf
         Returns:
             np.ndarray : the output of the RBF Kernel function
         """
-<<<<<<< HEAD
-<<<<<<< HEAD
-        return torch.exp(-torch.linalg.norm(u - v)**2 / (2*0.1))
-=======
-        return torch.exp(-torch.linalg.norm(u - v) ** 2 / 2 / variance)
->>>>>>> [eval] move src out
-=======
         return torch.exp(-torch.linalg.norm(u - v) ** 2 / (2 * 0.1))
->>>>>>> [EVAL] Generated metrics
 
     def evaluate(self, xs):
         """
@@ -481,35 +424,23 @@ class KernelRegression(Task):
         # Move the tensors to the same device
         alphas = self.alphas.to(xs.device)
         variances = self.vars.to(xs.device)
-<<<<<<< HEAD
         for i in range(len(xs)): 
-=======
-        for i in range(len(xs)):
->>>>>>> [eval] move src out
             example = xs[i]
             for j in range(len(example)):
                 for k in range(len(example)):
                     # Need to find all pairwise distances
                     # Use the alpha for the current batch and data point
                     # Use the variance for the current batch
-<<<<<<< HEAD
-                    res[i, j] += alphas[i, j] * self.rbf_kernel(example[j], example[k], variances[i])
-=======
                     res[i, j] += alphas[i, j] * self.rbf_kernel(
                         example[j], example[k], variances[i]
                     )
->>>>>>> [eval] move src out
         return res
 
     @staticmethod
     def generate_pool_dict(n_dims, num_tasks, n_points=None, **kwargs):
         return {
             "alpha": torch.randn(num_tasks, n_points),
-<<<<<<< HEAD
             "vars": torch.randn(num_tasks)**2
-=======
-            "vars": torch.randn(num_tasks) ** 2,
->>>>>>> [eval] move src out
         }
 
     @staticmethod
@@ -518,9 +449,6 @@ class KernelRegression(Task):
 
     @staticmethod
     def get_training_metric():
-<<<<<<< HEAD
-        return mean_squared_error
-=======
         return mean_squared_error
 
 
@@ -550,4 +478,3 @@ class NoisyKernelRegression(KernelRegression):
             ys_b_noisy = ys_b_noisy * math.sqrt(self.n_dims) / ys_b_noisy.std()
 
         return ys_b_noisy
->>>>>>> [eval] move src out
