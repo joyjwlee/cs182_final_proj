@@ -410,7 +410,7 @@ class KernelRegression(Task):
         Returns:
             np.ndarray : the output of the RBF Kernel function
         """
-        return torch.exp(-torch.linalg.norm(u - v)**2 / 2 / variance)
+        return torch.exp(-torch.linalg.norm(u - v)**2 / (2*0.1))
 
     def evaluate(self, xs):
         """
