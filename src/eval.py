@@ -292,7 +292,7 @@ def compute_evals(all_models, evaluation_kwargs, save_path=None, recompute=False
     except Exception:
         all_metrics = {}
 
-    print(evaluation_kwargs)
+    # print(evaluation_kwargs)
 
     for eval_name, kwargs in tqdm(evaluation_kwargs.items()):
 
@@ -326,7 +326,6 @@ def get_run_metrics(
         if not skip_baselines:
             all_models += models.get_relevant_baselines(conf.training.task)
     evaluation_kwargs = build_evals(conf)
-    print(evaluation_kwargs)
 
     if not cache:
         save_path = None

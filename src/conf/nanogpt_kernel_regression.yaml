@@ -7,9 +7,15 @@ model:
     family: nanogpt    # Specify the NanoGPT model family
     n_dims: 5          # Input dimension (usually task-specific)
     n_positions: 101    # Number of context points (task-specific)
+<<<<<<< HEAD
     n_embd: 256        # Embedding dimension
     n_layer: 12         # Number of transformer layers
     n_head: 8          # Number of attention heads
+=======
+    n_embd: 128        # Embedding dimension
+    n_layer: 6         # Number of transformer layers
+    n_head: 4          # Number of attention heads
+>>>>>>> [eval] move src out
     dropout: 0.1       # Dropout rate for NanoGPT
     bias: True         # Whether to use bias in NanoGPT layers
 
@@ -21,7 +27,11 @@ training:
     learning_rate: 0.0001
     save_every_steps: 1000
     keep_every_steps: 100000
+<<<<<<< HEAD
     train_steps: 1001       # Match toy.yaml for comparison
+=======
+    train_steps: 500001       # Match toy.yaml for comparison
+>>>>>>> [eval] move src out
     curriculum:             # Keep curriculum same as toy.yaml for comparison
         dims:
             start: 5
@@ -32,7 +42,11 @@ training:
             start: 10
             end: 40
             inc: 2
+<<<<<<< HEAD
             interval: 50
+=======
+            interval: 2000
+>>>>>>> [eval] move src out
 
 out_dir: ../models/kernel_regression/nanogpt # Separate output directory
 
