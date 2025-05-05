@@ -107,6 +107,7 @@ def get_relevant_baselines(task_name):
         ],
         "kernel_regression": [
             (LeastSquaresModel, {}),
+            (ZeroEstimator, {}),
             (NNModel, {"n_neighbors": 3}),
             (AveragingModel, {}),
             (KernelLinearRegressionModel, {})
@@ -456,7 +457,7 @@ class LeastSquaresModel:
 class KernelLinearRegressionModel:
     def __init__(self, driver=None):
         self.driver = driver
-        self.name = f"kernelridge_driver={driver}"
+        self.name = f"kernelregression_driver={driver}"
         self.lam = 1e-3
         self.sigma= 1
 
@@ -778,3 +779,24 @@ class XGBoostModel:
             preds.append(pred)
 
         return torch.stack(preds, dim=1)
+
+class ZeroEstimator:
+    def __init__(self):
+        self.name="zero_estimator"
+    def __call__(self, xs, ys,inds=None):
+        xs, ys = xs.cpu(), ys.cpu()
+
+        if inds is None:
+            inds = range(ys.shape[1])
+        else:
+            if max(inds) >= ys.shape[1] or min(inds) < 0:
+                raise ValueError("inds contain indices where xs and ys are not defined")
+
+        preds = []
+
+        # i: loop over num_points
+        # j: loop over bsize
+        for i in tqdm(inds):
+            pred = torch.zeros_like(ys[:, 0])
+            preds.append(pred)
+        return torch.stack(preds,dim=1)
