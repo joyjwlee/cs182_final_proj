@@ -14,6 +14,3 @@ Setting up the jupyter notebook kernel for `eval.ipynb`
 ```
 python -m ipykernel install --user --name=in-context-learning
 ```
-
-# Reproducing Results
-TODO
