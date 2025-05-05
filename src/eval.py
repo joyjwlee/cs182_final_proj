@@ -25,11 +25,11 @@ def get_model_from_run(run_path, step=-1, only_conf=False):
 
     if step == -1:
         state_path = os.path.join(run_path, "state.pt")
-        state = torch.load(state_path, map_location=torch.device("cpu"))
+        state = torch.load(state_path, map_location=torch.device("cuda"))
         model.load_state_dict(state["model_state_dict"])
     else:
         model_path = os.path.join(run_path, f"model_{step}.pt")
-        state_dict = torch.load(model_path, map_location=torch.device("cpu"))
+        state_dict = torch.load(model_path, map_location=torch.device("cuda"))
         model.load_state_dict(state_dict)
 
     return model, conf
@@ -160,7 +160,7 @@ def eval_model(
     n_dims,
     n_points,
     prompting_strategy,
-    num_eval_examples=1280,
+    num_eval_examples=2,
     batch_size=64,
     data_sampler_kwargs={},
     task_sampler_kwargs={},
@@ -173,6 +173,7 @@ def eval_model(
        - num_eval_examples: total number of examples to evaluate on
        - **sampler_kwargs: remaining arguments to pass directly to the sampler
     """
+    batch_size=2
     assert num_eval_examples % batch_size == 0
     data_sampler = get_data_sampler(data_name, n_dims, **data_sampler_kwargs)
     task_sampler = get_task_sampler(
@@ -216,10 +217,10 @@ def build_evals(conf):
     if task_name != "linear_regression":
         if task_name in ["relu_2nn_regression"]:
             evaluation_kwargs["linear_regression"] = {"task_name": "linear_regression"}
-        for name, kwargs in evaluation_kwargs.items():
-            # allow kwargs to override base_kwargs values
-            evaluation_kwargs[name] = base_kwargs.copy()
-            evaluation_kwargs[name].update(kwargs)
+        # for name, kwargs in evaluation_kwargs.items():
+        #     # allow kwargs to override base_kwargs values
+        #     evaluation_kwargs[name] = base_kwargs.copy()
+        #     evaluation_kwargs[name].update(kwargs)
 
         # For Kernel Linear Regression
         if task_name == "kernel_regression":
@@ -235,10 +236,15 @@ def build_evals(conf):
             }
 
             # noisy labels
-            evaluation_kwargs[f"noisyKR"] = {
+            evaluation_kwargs["noisyKR"] = {
                 "task_sampler_kwargs": {"renormalize_ys": True, "noise_std": 1},
                 "task_name": "noisy_kernel_regression",
             }
+
+            for name, kwargs in evaluation_kwargs.items():
+                # allow kwargs to override base_kwargs values
+                evaluation_kwargs[name] = base_kwargs.copy()
+                evaluation_kwargs[name].update(kwargs)
         return evaluation_kwargs
 
     for strategy in [
@@ -321,7 +327,7 @@ def get_run_metrics(
         all_models = []
     else:
         model, conf = get_model_from_run(run_path, step)
-        model = model.eval()  # model.cuda().eval()
+        model = model.cuda().eval() # model.eval()  # 
         all_models = [model]
         if not skip_baselines:
             all_models += models.get_relevant_baselines(conf.training.task)
@@ -330,7 +336,7 @@ def get_run_metrics(
     if not cache:
         save_path = None
     elif step == -1:
-        save_path = os.path.join(run_path, "metrics.json")
+        save_path = os.path.join(run_path, "/distr_shift/metrics.json")
     else:
         save_path = os.path.join(run_path, f"metrics_{step}.json")
 
@@ -415,7 +421,6 @@ def read_run_dir(run_dir):
     df = pd.DataFrame(all_runs).sort_values("run_name")
     assert len(df) == len(df.run_name.unique())
     return df
-
 
 if __name__ == "__main__":
     run_dir = sys.argv[1]
