@@ -160,7 +160,7 @@ def eval_model(
     n_dims,
     n_points,
     prompting_strategy,
-    num_eval_examples=2,
+    num_eval_examples=128,
     batch_size=64,
     data_sampler_kwargs={},
     task_sampler_kwargs={},
@@ -173,7 +173,6 @@ def eval_model(
        - num_eval_examples: total number of examples to evaluate on
        - **sampler_kwargs: remaining arguments to pass directly to the sampler
     """
-    batch_size=2
     assert num_eval_examples % batch_size == 0
     data_sampler = get_data_sampler(data_name, n_dims, **data_sampler_kwargs)
     task_sampler = get_task_sampler(
@@ -217,10 +216,10 @@ def build_evals(conf):
     if task_name != "linear_regression":
         if task_name in ["relu_2nn_regression"]:
             evaluation_kwargs["linear_regression"] = {"task_name": "linear_regression"}
-        # for name, kwargs in evaluation_kwargs.items():
-        #     # allow kwargs to override base_kwargs values
-        #     evaluation_kwargs[name] = base_kwargs.copy()
-        #     evaluation_kwargs[name].update(kwargs)
+        for name, kwargs in evaluation_kwargs.items():
+            # allow kwargs to override base_kwargs values
+            evaluation_kwargs[name] = base_kwargs.copy()
+            evaluation_kwargs[name].update(kwargs)
 
         # For Kernel Linear Regression
         if task_name == "kernel_regression":
@@ -233,11 +232,12 @@ def build_evals(conf):
             scale = sample_transformation(eigenvals, normalize=True)
             evaluation_kwargs["skewed"] = {
                 "data_sampler_kwargs": {"scale": scale},
+                "task_sampler_kwargs": {"n_points": evaluation_kwargs["standard"]["n_points"]} 
             }
 
             # noisy labels
             evaluation_kwargs["noisyKR"] = {
-                "task_sampler_kwargs": {"renormalize_ys": True, "noise_std": 1},
+                "task_sampler_kwargs": {"renormalize_ys": True, "noise_std": 1, "n_points": evaluation_kwargs["standard"]["n_points"]},
                 "task_name": "noisy_kernel_regression",
             }
 
@@ -308,7 +308,6 @@ def compute_evals(all_models, evaluation_kwargs, save_path=None, recompute=False
         for model in all_models:
             if model.name in metrics and not recompute:
                 continue
-
             metrics[model.name] = eval_model(model, **kwargs)
         all_metrics[eval_name] = metrics
 
@@ -336,7 +335,7 @@ def get_run_metrics(
     if not cache:
         save_path = None
     elif step == -1:
-        save_path = os.path.join(run_path, "/distr_shift/metrics.json")
+        save_path = os.path.join(run_path, "distr_shift/metrics.json")
     else:
         save_path = os.path.join(run_path, f"metrics_{step}.json")
 
@@ -346,7 +345,6 @@ def get_run_metrics(
         cache_created = os.path.getmtime(save_path)
         if checkpoint_created > cache_created:
             recompute = True
-
     all_metrics = compute_evals(all_models, evaluation_kwargs, save_path, recompute)
     return all_metrics
 
@@ -381,6 +379,8 @@ def baseline_names(name):
         return "XGBoost"
     if "kernel" in name:
         return "Kernel Regression"
+    if name == "zero_estimator":
+        return "Zero Estimator"
     return name
 
 

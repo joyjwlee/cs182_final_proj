@@ -460,10 +460,14 @@ class KernelRegression(Task):
             np.ndarray : the output of the RBF Kernel function
         """
 <<<<<<< HEAD
+<<<<<<< HEAD
         return torch.exp(-torch.linalg.norm(u - v)**2 / (2*0.1))
 =======
         return torch.exp(-torch.linalg.norm(u - v) ** 2 / 2 / variance)
 >>>>>>> [eval] move src out
+=======
+        return torch.exp(-torch.linalg.norm(u - v) ** 2 / (2 * 0.1))
+>>>>>>> [EVAL] Generated metrics
 
     def evaluate(self, xs):
         """
@@ -530,10 +534,11 @@ class NoisyKernelRegression(KernelRegression):
         scale=1,
         noise_std=0,
         renormalize_ys=False,
+        n_points=None
     ):
         """noise_std: standard deviation of noise added to the prediction."""
-        super(NoisyLinearRegression, self).__init__(
-            n_dims, batch_size, pool_dict, seeds, scale
+        super(NoisyKernelRegression, self).__init__(
+            n_dims, batch_size, pool_dict, seeds, n_points
         )
         self.noise_std = noise_std
         self.renormalize_ys = renormalize_ys
