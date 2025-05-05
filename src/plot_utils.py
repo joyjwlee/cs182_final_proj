@@ -45,7 +45,7 @@ relevant_model_names = {
         "Averaging"
     ], 
     "kernel_regression_mamba": [
-        "mamba_toy",
+        "mamba",
         "Kernel Regression",
         "Least Squares",
         "3-Nearest Neighbors",
