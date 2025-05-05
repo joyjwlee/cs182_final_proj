@@ -37,6 +37,20 @@ relevant_model_names = {
         "3-Nearest Neighbors",
         "2-layer NN, GD",
     ],
+    "kernel_regression_nanogpt": [
+        "nanogpt_kernel_regression",
+        "Kernel Regression",
+        "Least Squares",
+        "3-Nearest Neighbors",
+        "Averaging"
+    ], 
+    "kernel_regression_mamba": [
+        "mamba_toy",
+        "Kernel Regression",
+        "Least Squares",
+        "3-Nearest Neighbors",
+        "Averaging"
+    ],
 }
 
 
@@ -57,7 +71,7 @@ def basic_plot(metrics, models=None, trivial=1.0):
     ax.set_xlabel("in-context examples")
     ax.set_ylabel("squared error")
     ax.set_xlim(-1, len(low) + 0.1)
-    ax.set_ylim(-0.1, 1.25)
+    # ax.set_ylim(-0.1, 30)
 
     legend = ax.legend(loc="upper left", bbox_to_anchor=(1, 1))
     fig.set_size_inches(4, 3)
@@ -78,11 +92,11 @@ def collect_results(run_dir, df, valid_row=None, rename_eval=None, rename_model=
 
         print(r.run_name, r.run_id)
         metrics = get_run_metrics(run_path, skip_model_load=True)
-
+        
         for eval_name, results in sorted(metrics.items()):
             processed_results = {}
             for model_name, m in results.items():
-                if "gpt2" in model_name in model_name:
+                if "gpt2" in model_name or "mamba" in model_name or "nanogpt" in model_name:
                     model_name = r.model
                     if rename_model is not None:
                         model_name = rename_model(model_name, r)
@@ -94,6 +108,8 @@ def collect_results(run_dir, df, valid_row=None, rename_eval=None, rename_model=
                 xlim = 2 * n_dims + 1
                 if r.task in ["relu_2nn_regression", "decision_tree"]:
                     xlim = 200
+                if r.task in ["kernel_regression"]:
+                    xlim = 41 # Hacky way to get the full context window size to print
 
                 normalization = n_dims
                 if r.task == "sparse_linear_regression":

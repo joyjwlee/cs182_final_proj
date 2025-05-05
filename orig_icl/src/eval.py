@@ -25,11 +25,11 @@ def get_model_from_run(run_path, step=-1, only_conf=False):
 
     if step == -1:
         state_path = os.path.join(run_path, "state.pt")
-        state = torch.load(state_path)
+        state = torch.load(state_path, map_location=torch.device("cpu"))
         model.load_state_dict(state["model_state_dict"])
     else:
         model_path = os.path.join(run_path, f"model_{step}.pt")
-        state_dict = torch.load(model_path)
+        state_dict = torch.load(model_path, map_location=torch.device("cpu"))
         model.load_state_dict(state_dict)
 
     return model, conf
@@ -40,7 +40,12 @@ def get_model_from_run(run_path, step=-1, only_conf=False):
 
 def eval_batch(model, task_sampler, xs, xs_p=None):
     task = task_sampler()
-    if torch.cuda.is_available() and model.name.split("_")[0] in ["gpt2", "lstm"]:
+    if torch.cuda.is_available() and model.name.split("_")[0] in [
+        "gpt2",
+        "lstm",
+        "nanogpt",
+        "mamba",
+    ]:
         device = "cuda"
     else:
         device = "cpu"
@@ -168,7 +173,6 @@ def eval_model(
        - num_eval_examples: total number of examples to evaluate on
        - **sampler_kwargs: remaining arguments to pass directly to the sampler
     """
-
     assert num_eval_examples % batch_size == 0
     data_sampler = get_data_sampler(data_name, n_dims, **data_sampler_kwargs)
     task_sampler = get_task_sampler(
@@ -216,6 +220,25 @@ def build_evals(conf):
             # allow kwargs to override base_kwargs values
             evaluation_kwargs[name] = base_kwargs.copy()
             evaluation_kwargs[name].update(kwargs)
+
+        # For Kernel Linear Regression
+        if task_name == "kernel_regression":
+            evaluation_kwargs["standard"]["task_sampler_kwargs"] = {
+                "n_points": evaluation_kwargs["standard"]["n_points"]
+            }
+
+            # skewed covariance
+            eigenvals = 1 / (torch.arange(n_dims) + 1)
+            scale = sample_transformation(eigenvals, normalize=True)
+            evaluation_kwargs["skewed"] = {
+                "data_sampler_kwargs": {"scale": scale},
+            }
+
+            # noisy labels
+            evaluation_kwargs[f"noisyKR"] = {
+                "task_sampler_kwargs": {"renormalize_ys": True, "noise_std": 1},
+                "task_name": "noisy_kernel_regression",
+            }
         return evaluation_kwargs
 
     for strategy in [
@@ -269,7 +292,10 @@ def compute_evals(all_models, evaluation_kwargs, save_path=None, recompute=False
     except Exception:
         all_metrics = {}
 
+    print(evaluation_kwargs)
+
     for eval_name, kwargs in tqdm(evaluation_kwargs.items()):
+
         metrics = {}
         if eval_name in all_metrics and not recompute:
             metrics = all_metrics[eval_name]
@@ -295,11 +321,12 @@ def get_run_metrics(
         all_models = []
     else:
         model, conf = get_model_from_run(run_path, step)
-        model = model.cuda().eval()
+        model = model.eval()  # model.cuda().eval()
         all_models = [model]
         if not skip_baselines:
             all_models += models.get_relevant_baselines(conf.training.task)
     evaluation_kwargs = build_evals(conf)
+    print(evaluation_kwargs)
 
     if not cache:
         save_path = None
@@ -317,7 +344,6 @@ def get_run_metrics(
 
     all_metrics = compute_evals(all_models, evaluation_kwargs, save_path, recompute)
     return all_metrics
-
 
 
 def conf_to_model_name(conf):
@@ -348,6 +374,8 @@ def baseline_names(name):
         return "Greedy Tree Learning"
     if "xgboost" in name:
         return "XGBoost"
+    if "kernel" in name:
+        return "Kernel Regression"
     return name
 
 
@@ -390,6 +418,7 @@ def read_run_dir(run_dir):
     df = pd.DataFrame(all_runs).sort_values("run_name")
     assert len(df) == len(df.run_name.unique())
     return df
+
 
 if __name__ == "__main__":
     run_dir = sys.argv[1]

@@ -81,7 +81,7 @@ def train(model, args):
             curriculum.n_dims_truncated,
             **data_sampler_args,
         )
-        if (args.training.task == "kernel_regression"):
+        if args.training.task == "kernel_regression":
             task_sampler_args["n_points"] = curriculum.n_points
         task = task_sampler(**task_sampler_args)
         ys = task.evaluate(xs)
@@ -166,7 +166,7 @@ def main(args):
 if __name__ == "__main__":
     parser = QuinineArgumentParser(schema=schema)
     args = parser.parse_quinfig()
-    assert args.model.family in ["gpt2", "lstm", "nanogpt"]
+    assert args.model.family in ["gpt2", "lstm", "nanogpt", "mamba"]
     print(f"Running with: {args}")
 
     if not args.test_run:
