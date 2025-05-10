@@ -1,5 +1,5 @@
 .ipynb_checkpoints
 __pycache__
 models.zip
-models
-# orig_icl/
+# Only want to ignore the trained models and metrics, not src/conf/models/*
+models/*
