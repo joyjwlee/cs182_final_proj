@@ -350,13 +350,14 @@ def get_run_metrics(
     if not cache:
         save_path = None
     elif step == -1:
-        save_path = os.path.join(run_path, "metrics.json")
+        # Save the metrics at the first run path
+        save_path = os.path.join(run_path[0], "metrics.json")
     else:
-        save_path = os.path.join(run_path, f"metrics_{step}.json")
+        save_path = os.path.join(run_path[0], f"metrics_{step}.json")
 
     recompute = False
     if save_path is not None and os.path.exists(save_path):
-        checkpoint_created = os.path.getmtime(run_path)
+        checkpoint_created = os.path.getmtime(run_path[0])
         cache_created = os.path.getmtime(save_path)
         if checkpoint_created > cache_created:
             recompute = True
