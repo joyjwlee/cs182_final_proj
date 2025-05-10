@@ -25,11 +25,11 @@ def get_model_from_run(run_path, step=-1, only_conf=False):
 
     if step == -1:
         state_path = os.path.join(run_path, "state.pt")
-        state = torch.load(state_path, map_location=torch.device('cpu'))
+        state = torch.load(state_path, map_location=torch.device("cpu"))
         model.load_state_dict(state["model_state_dict"])
     else:
         model_path = os.path.join(run_path, f"model_{step}.pt")
-        state_dict = torch.load(model_path, map_location=torch.device('cpu'))
+        state_dict = torch.load(model_path, map_location=torch.device("cpu"))
         model.load_state_dict(state_dict)
 
     return model, conf
@@ -40,7 +40,12 @@ def get_model_from_run(run_path, step=-1, only_conf=False):
 
 def eval_batch(model, task_sampler, xs, xs_p=None):
     task = task_sampler()
-    if torch.cuda.is_available() and model.name.split("_")[0] in ["gpt2", "lstm", "nanogpt", "mamba"]:
+    if torch.cuda.is_available() and model.name.split("_")[0] in [
+        "gpt2",
+        "lstm",
+        "nanogpt",
+        "mamba",
+    ]:
         device = "cuda"
     else:
         device = "cpu"
@@ -155,7 +160,7 @@ def eval_model(
     n_dims,
     n_points,
     prompting_strategy,
-    num_eval_examples= 1280,
+    num_eval_examples=1280,
     batch_size=64,
     data_sampler_kwargs={},
     task_sampler_kwargs={},
@@ -221,6 +226,19 @@ def build_evals(conf):
             evaluation_kwargs["standard"]["task_sampler_kwargs"] = {
                 "n_points": evaluation_kwargs["standard"]["n_points"]
             }
+
+            # skewed covariance
+            eigenvals = 1 / (torch.arange(n_dims) + 1)
+            scale = sample_transformation(eigenvals, normalize=True)
+            evaluation_kwargs["skewed"] = {
+                "data_sampler_kwargs": {"scale": scale},
+            }
+
+            # noisy labels
+            evaluation_kwargs[f"noisyKR"] = {
+                "task_sampler_kwargs": {"renormalize_ys": True, "noise_std": 1},
+                "task_name": "noisy_kernel_regression",
+            }
         return evaluation_kwargs
 
     for strategy in [
@@ -274,7 +292,10 @@ def compute_evals(all_models, evaluation_kwargs, save_path=None, recompute=False
     except Exception:
         all_metrics = {}
 
+    # print(evaluation_kwargs)
+
     for eval_name, kwargs in tqdm(evaluation_kwargs.items()):
+
         metrics = {}
         if eval_name in all_metrics and not recompute:
             metrics = all_metrics[eval_name]
@@ -300,7 +321,7 @@ def get_run_metrics(
         all_models = []
     else:
         model, conf = get_model_from_run(run_path, step)
-        model = model.cuda().eval()
+        model = model.eval()  # model.cuda().eval()
         all_models = [model]
         if not skip_baselines:
             all_models += models.get_relevant_baselines(conf.training.task)
@@ -362,34 +383,36 @@ def read_run_dir(run_dir):
     for task in os.listdir(run_dir):
         task_dir = os.path.join(run_dir, task)
         for run_id in os.listdir(task_dir):
-            run_path = os.path.join(task_dir, run_id)
-            _, conf = get_model_from_run(run_path, only_conf=True)
-            params = {}
-            params["run_id"] = run_id
-            params["task"] = task
-            params["model"] = conf_to_model_name(conf)
-            params["kwargs"] = "_".join(
-                f"{k}={v}" for k, v in conf.training.task_kwargs.items()
-            )
-            num_tasks = (
-                conf.training.num_tasks if "num_tasks" in conf.training else None
-            )
-            params["num_tasks"] = num_tasks if num_tasks is not None else -1
-            num_examples = (
-                conf.training.num_training_examples
-                if "num_training_examples" in conf.training
-                else None
-            )
-            params["num_examples"] = num_examples if num_examples is not None else -1
-            params["n_dims"] = conf.model.n_dims
-            params["n_layer"] = conf.model.n_layer
-            params["n_head"] = conf.model.n_head
-            params["run_name"] = conf.wandb.name
+            run_id_dir = os.path.join(task_dir, run_id)
+            for model in os.list_dir(run_id_dir):
+                run_path = os.path.join(run_id_dir, model)
+                _, conf = get_model_from_run(run_path, only_conf=True)
+                params = {}
+                params["run_id"] = run_id
+                params["task"] = task
+                params["model"] = conf_to_model_name(conf)
+                params["kwargs"] = "_".join(
+                    f"{k}={v}" for k, v in conf.training.task_kwargs.items()
+                )
+                num_tasks = (
+                    conf.training.num_tasks if "num_tasks" in conf.training else None
+                )
+                params["num_tasks"] = num_tasks if num_tasks is not None else -1
+                num_examples = (
+                    conf.training.num_training_examples
+                    if "num_training_examples" in conf.training
+                    else None
+                )
+                params["num_examples"] = num_examples if num_examples is not None else -1
+                params["n_dims"] = conf.model.n_dims
+                params["n_layer"] = conf.model.n_layer
+                params["n_head"] = conf.model.n_head
+                params["run_name"] = conf.wandb.name
 
-            for k, v in params.items():
-                if k not in all_runs:
-                    all_runs[k] = []
-                all_runs[k].append(v)
+                for k, v in params.items():
+                    if k not in all_runs:
+                        all_runs[k] = []
+                    all_runs[k].append(v)
 
     df = pd.DataFrame(all_runs).sort_values("run_name")
     assert len(df) == len(df.run_name.unique())
