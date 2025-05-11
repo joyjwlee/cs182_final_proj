@@ -331,7 +331,7 @@ def get_run_metrics(
     Computes the metrics for the models in the list of run pathhs
     """
     if skip_model_load:
-        _, conf = get_model_from_run(run_path, only_conf=True)
+        _, conf = get_model_from_run(run_path[0], only_conf=True)
         all_models = []
     else:
         all_models = []
@@ -397,6 +397,11 @@ def baseline_names(name):
         return "Kernel Regression"
     if name == "zero_estimator":
         return "Zero Estimator"
+    if "nanogpt" in name:
+        return "NanoGPT"
+    if "mamba" in name:
+        return "Mamba"
+
     return name
 
 

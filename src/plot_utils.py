@@ -44,13 +44,15 @@ relevant_model_names = {
         "3-Nearest Neighbors",
         "Averaging"
     ], 
-    "kernel_regression_mamba": [
-        "mamba_toy",
-        "Kernel Regression",
+    "kernel_regression": [
+        "NanoGPT",
+        "Mamba",
         "Least Squares",
-        "3-Nearest Neighbors",
-        "Averaging"
-    ],
+        "3-Nearest Neighbors", 
+        "Averaging",
+        "Zero Estimator",
+        "Kernel Regression"
+    ]
 }
 
 
@@ -71,7 +73,7 @@ def basic_plot(metrics, models=None, trivial=1.0):
     ax.set_xlabel("in-context examples")
     ax.set_ylabel("squared error")
     ax.set_xlim(-1, len(low) + 0.1)
-    # ax.set_ylim(-0.1, 30)
+    ax.set_ylim(-0.1, 3)
 
     legend = ax.legend(loc="upper left", bbox_to_anchor=(1, 1))
     fig.set_size_inches(4, 3)
@@ -91,8 +93,8 @@ def collect_results(run_dir, df, valid_row=None, rename_eval=None, rename_model=
         _, conf = get_model_from_run(run_path, only_conf=True)
 
         print(r.run_name, r.run_id)
-        metrics = get_run_metrics(run_path, skip_model_load=True)
-        
+        metrics = get_run_metrics([run_path], skip_model_load=True)
+
         for eval_name, results in sorted(metrics.items()):
             processed_results = {}
             for model_name, m in results.items():
