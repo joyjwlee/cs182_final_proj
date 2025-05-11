@@ -37,13 +37,6 @@ relevant_model_names = {
         "3-Nearest Neighbors",
         "2-layer NN, GD",
     ],
-    "kernel_regression_nanogpt": [
-        "nanogpt_kernel_regression",
-        "Kernel Regression",
-        "Least Squares",
-        "3-Nearest Neighbors",
-        "Averaging"
-    ], 
     "kernel_regression": [
         "NanoGPT",
         "Mamba",
@@ -98,7 +91,7 @@ def collect_results(run_dir, df, valid_row=None, rename_eval=None, rename_model=
         for eval_name, results in sorted(metrics.items()):
             processed_results = {}
             for model_name, m in results.items():
-                if "gpt2" in model_name or "mamba" in model_name or "nanogpt" in model_name:
+                if "gpt2" in model_name:
                     model_name = r.model
                     if rename_model is not None:
                         model_name = rename_model(model_name, r)
