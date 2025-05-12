@@ -25,11 +25,17 @@ def get_model_from_run(run_path, step=-1, only_conf=False):
 
     if step == -1:
         state_path = os.path.join(run_path, "state.pt")
-        state = torch.load(state_path, map_location=torch.device("cuda"))
+        if torch.cuda.is_available():
+            state = torch.load(state_path, map_location=torch.device("cuda"))
+        else:
+            state = torch.load(state_path, map_location=torch.device("cpu"))
         model.load_state_dict(state["model_state_dict"])
     else:
         model_path = os.path.join(run_path, f"model_{step}.pt")
-        state_dict = torch.load(model_path, map_location=torch.device("cuda"))
+        if torch.cuda.is_available():
+            state_dict = torch.load(model_path, map_location=torch.device("cuda"))
+        else:
+            state_dict = torch.load(model_path, map_location=torch.device("cpu"))
         model.load_state_dict(state_dict)
 
     return model, conf
@@ -321,27 +327,37 @@ def compute_evals(all_models, evaluation_kwargs, save_path=None, recompute=False
 def get_run_metrics(
     run_path, step=-1, cache=True, skip_model_load=False, skip_baselines=False
 ):
+    """
+    Computes the metrics for the models in the list of run pathhs
+    """
     if skip_model_load:
-        _, conf = get_model_from_run(run_path, only_conf=True)
+        _, conf = get_model_from_run(run_path[0], only_conf=True)
         all_models = []
     else:
-        model, conf = get_model_from_run(run_path, step)
-        model = model.cuda().eval() # model.eval()  # 
-        all_models = [model]
+        all_models = []
+        for path in run_path:
+            model, conf = get_model_from_run(path, step)
+            if torch.cuda.is_available():
+                model = model.cuda().eval()
+            else:
+                model = model.eval()
+            all_models.append(model)
         if not skip_baselines:
             all_models += models.get_relevant_baselines(conf.training.task)
+    # The conf will be the same for both types of models
     evaluation_kwargs = build_evals(conf)
 
     if not cache:
         save_path = None
     elif step == -1:
-        save_path = os.path.join(run_path, "distr_shift/metrics.json")
+        # Save the metrics at the first run path
+        save_path = os.path.join(run_path[0], "metrics.json")
     else:
-        save_path = os.path.join(run_path, f"metrics_{step}.json")
+        save_path = os.path.join(run_path[0], f"metrics_{step}.json")
 
     recompute = False
     if save_path is not None and os.path.exists(save_path):
-        checkpoint_created = os.path.getmtime(run_path)
+        checkpoint_created = os.path.getmtime(run_path[0])
         cache_created = os.path.getmtime(save_path)
         if checkpoint_created > cache_created:
             recompute = True
@@ -381,6 +397,11 @@ def baseline_names(name):
         return "Kernel Regression"
     if name == "zero_estimator":
         return "Zero Estimator"
+    if "nanogpt" in name:
+        return "NanoGPT"
+    if "mamba" in name:
+        return "Mamba"
+
     return name
 
 
