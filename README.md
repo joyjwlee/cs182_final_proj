@@ -64,7 +64,7 @@ If you store your models somewhere else, change the `run_dir` variable at the to
 # Our Results
 To download our results, please download our models.zip file using this command:
 ```
-wget https://github.com/joyjwlee/cs182_final_proj/releases/initial/download/initial/models.zip
+wget https://github.com/joyjwlee/cs182_final_proj/releases/download/initial/models.zip
 unzip models.zip
 ```
 
