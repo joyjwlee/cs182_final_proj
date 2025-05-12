@@ -21,14 +21,27 @@ python -m ipykernel install --user --name=icl
 
 If you want to train your own models on our scripts, please create a `models/` directory in the root directory of this repo. Therefore, the file structure should look like the following:
 ```
-|--models/
-|--src/
-  |--conf/
-  |--data/
-  |--base_models.py
-  |--...
-|--environment.yml
-|- ...
+.
+├── LICENSE
+├── README.md
+├── environment.yml
+├── models
+└── src
+    ├── base_models.py
+    ├── conf
+    ├── curriculum.py
+    ├── data
+    │   ├── __init__.py
+    │   ├── data_sampler.py
+    │   └── tasks.py
+    ├── eval.ipynb
+    ├── eval.py
+    ├── mamba_model.py
+    ├── models.py
+    ├── nanogpt_model.py
+    ├── plot_utils.py
+    ├── schema.py
+    └── train.py
 ```
 
 # Training
